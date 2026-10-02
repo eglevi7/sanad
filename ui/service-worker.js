@@ -1,12 +1,14 @@
 const CACHE_NAME = "sanad-v1";
 const ASSETS = [
     "/",
-    "/index.html",
-    "/style.css",
-    "/mobile.css",
-    "/tablet.css",
-    "/script.js",
-    "/logo.png"
+    "/ui/index.html",
+    "/ui/style.css",
+    "/ui/mobile.css",
+    "/ui/tablet.css",
+    "/ui/script.js",
+    "/ui/logo.png",
+    "/ui/icon-192.png",
+    "/ui/icon-512.png"
 ];
 
 // تثبيت
