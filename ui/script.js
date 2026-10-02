@@ -414,7 +414,7 @@ window.addEventListener("load", () => {
 // ============== PWA Service Worker ==============
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/service-worker.js")
+        navigator.serviceWorker.register("/ui/service-worker.js")
             .then((reg) => console.log("✅ SW registered:", reg.scope))
             .catch((err) => console.log("❌ SW failed:", err));
     });
