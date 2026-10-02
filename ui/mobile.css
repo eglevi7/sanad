@@ -1,0 +1,158 @@
+/* ============================================
+   Mobile UI — 768px or less
+   ============================================ */
+
+@media (max-width: 768px) {
+
+    /* ============ Header: بسيط ============ */
+    header {
+        padding: 10px 14px;
+        border-bottom: none;
+        box-shadow: none;
+    }
+
+    .header-title {
+        display: none;
+    }
+
+    .status {
+        display: none;
+    }
+
+    .toggle-sidebar {
+        background: transparent;
+        border: none;
+        color: var(--text-primary);
+        font-size: 24px;
+        padding: 6px 10px;
+    }
+
+    .toggle-sidebar:hover {
+        background: transparent;
+        color: var(--text-primary);
+    }
+
+    /* ============ Sidebar: overlay ============ */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 1000;
+        height: 100vh;
+        width: 80%;
+        max-width: 300px;
+        box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar:not(.hidden) {
+        transform: translateX(0);
+    }
+
+    .sidebar.hidden {
+        margin-right: 0;
+        transform: translateX(100%);
+    }
+
+    /* ============ Welcome ============ */
+    .welcome {
+        padding: 20px;
+    }
+
+    .welcome-logo {
+        width: 64px;
+        height: 64px;
+        margin-bottom: 18px;
+        animation: none;
+    }
+
+    .welcome-title {
+        display: none;
+    }
+
+    .welcome-tagline {
+        font-size: 20px;
+        font-weight: 500;
+        color: var(--text-primary);
+        line-height: 1.5;
+        max-width: 280px;
+    }
+
+    /* ============ Chat ============ */
+    .chat {
+        padding: 12px 14px;
+        gap: 14px;
+    }
+
+    .message {
+        max-width: 92%;
+    }
+
+    .bubble {
+        padding: 10px 14px;
+        font-size: 15px;
+        border-radius: 18px;
+        line-height: 1.7;
+    }
+
+    /* ============ Input: Pill ============ */
+    .input-area {
+        padding: 8px 12px 14px;
+    }
+
+    .input-wrapper {
+        border-radius: 28px;
+        padding: 6px 6px 6px 16px;
+        min-height: 52px;
+    }
+
+    #input {
+        font-size: 16px;
+        padding: 10px 0;
+        max-height: 120px;
+    }
+
+    #send {
+        width: 40px;
+        height: 40px;
+    }
+
+    /* ============ Suggestions ============ */
+    .suggestions {
+        margin: 10px auto 0;
+        gap: 6px;
+        padding: 0 6px;
+    }
+
+    .suggestion-btn {
+        font-size: 13px;
+        padding: 7px 14px;
+        border-radius: 18px;
+    }
+
+    /* ============ Modal ============ */
+    .modal {
+        padding: 24px 20px;
+        border-radius: 20px;
+        margin: 16px;
+    }
+
+    .modal-logo {
+        width: 56px;
+        height: 56px;
+    }
+
+    .modal-title {
+        font-size: 19px;
+    }
+}
+
+#send.stop-mode {
+    background: #dc2626;
+    color: white;
+}
+
+#send.stop-mode:hover {
+    background: #b91c1c;
+}
