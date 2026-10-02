@@ -2,7 +2,7 @@
     "id": "/",
     "name": "Sanad — سند",
     "short_name": "Sanad",
-    "description": "مساعدك التعليمي الذكي — سندك في رحلتك",
+    "description": "مساعدك التعليمي الذكي",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
