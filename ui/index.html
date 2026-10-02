@@ -2,28 +2,30 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0d0d0d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Sanad">
     <title>Sanad</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="tablet.css">
-    <link rel="stylesheet" href="mobile.css">
+    <link rel="manifest" href="/ui/manifest.json">
+    <link rel="icon" type="image/png" href="/ui/logo.png">
+    <link rel="apple-touch-icon" href="/ui/icon-512.png">
+    <link rel="stylesheet" href="/ui/style.css">
+    <link rel="stylesheet" href="/ui/tablet.css">
+    <link rel="stylesheet" href="/ui/mobile.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0d0d0d">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Sanad">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-512.png">
 <body>
     <div class="app">
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="brand">
-                    <img src="logo.png" alt="Sanad" class="brand-logo">
+                    <img src="/ui/logo.png" alt="Sanad" class="brand-logo">
                     <span class="brand-text">Sanad</span>
                 </div>
                 <button class="new-chat-btn" id="new-chat">
@@ -52,7 +54,7 @@
             <div class="modal">
                 <button class="modal-close" id="close-modal">✕</button>
                 <div class="modal-header">
-                    <img src="logo.png" alt="Sanad" class="modal-logo">
+                    <img src="/ui/logo.png" alt="Sanad" class="modal-logo">
                     <h2 class="modal-title">تسجيل دخول Sanad</h2>
                     <p class="modal-subtitle">عشان نحفظ محادثاتك وتقدر ترجع لها في أي وقت</p>
                 </div>
@@ -92,7 +94,7 @@
 
             <!-- شاشة الترحيب -->
             <div class="welcome" id="welcome">
-                <img src="logo.png" alt="Sanad" class="welcome-logo">
+                <img src="/ui/logo.png" alt="Sanad" class="welcome-logo">
                 <h1 class="welcome-title">Sanad</h1>
                 <p class="welcome-tagline" id="welcome-tagline">سندك في رحلتك</p>
             </div>
@@ -116,6 +118,6 @@
         </main>
     </div>
 
-    <script src="script.js"></script>
+    <script src="/ui/script.js"></script>
 </body>
 </html>
