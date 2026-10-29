@@ -7,7 +7,6 @@ from book_search import (
     load_books,
     load_or_build_index,
     search as book_search_func,
-    detect_subject,
     SUBJECT_MAP,
 )
 
@@ -70,27 +69,27 @@ def get_chat_response(message, is_stream=False):
     norm_msg = normalize_text(message)
 
     # =====================================================
-    # 1. هل السؤال تعليمي؟ (فيه كلمة درس، شرح، مادة، إلخ)
+    # 1. هل الطالب بيطلب بحث حقيقي في الكتب؟ (نية البحث)
     # =====================================================
-    EDUCATIONAL_KEYWORDS = [
-        "اشرح", "لخص", "قارن", "احسب", "حل", "عرف", "مثال", "امثلة",
+    SEARCH_INTENT_KEYWORDS = [
+        "اشرح", "اشرحلي", "لخص", "لخصلي", "قارن", "احسب", "حل", "حللي",
+        "عرف", "تعريف", "مثال", "امثلة", "اذكر", "عدد",
         "درس", "الدرس", "وحدة", "الوحدة", "محتوى", "منهج",
-        "اسئلة", "سؤال", "تمرين", "اختبار"
+        "عايز اعرف", "ايه هي", "ايه هو", "ما هي", "ما هو"
     ]
     
-    is_educational = any(kw in norm_msg for kw in EDUCATIONAL_KEYWORDS)
+    is_search_intent = any(kw in norm_msg for kw in SEARCH_INTENT_KEYWORDS)
     
-    # لو فيه اسم مادة، يبقى تعليمي برضه
+    # لو الطالب ذكر اسم مادة صراحة مع نية بحث
+    has_subject = False
     for subj in SUBJECT_MAP.keys():
         if normalize_text(subj) in norm_msg:
-            is_educational = True
+            has_subject = True
             break
 
-    # =====================================================
-    # 2. البحث في الكتب (بس لو السؤال تعليمي)
-    # =====================================================
+    # لو الكلام مجرد سؤال عادي (ازيك، الحمد لله، عندي قناة...)، منبحثش في الكتب
     context = None
-    if is_educational:
+    if is_search_intent:
         results = book_search_func(message, BOOKS, INDEX, IDF, top_k=3)
         if results and results[0]["score"] >= 1.0:
             context_parts = []
@@ -99,7 +98,7 @@ def get_chat_response(message, is_stream=False):
             context = "\n\n---\n\n".join(context_parts)
 
     # =====================================================
-    # 3. نبعت للـ AI
+    # 2. نبعت للـ AI (مع أو بدون سياق من الكتب)
     # =====================================================
     if is_stream:
         return ask_groq_stream(message, context=context, history=CONVERSATION_HISTORY, is_lesson=False)
