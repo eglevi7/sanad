@@ -20,36 +20,53 @@ def get_chat_response(message, is_stream=False):
     if not message:
         return "اكتبلي حاجة الأول 😅" if not is_stream else iter(["اكتبلي حاجة الأول 😅"])
 
+    import re
+    norm_msg = message.lower()
+    norm_msg = re.sub(r'[\u064B-\u065F\u0670]', '', norm_msg)
+    norm_msg = norm_msg.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه").replace("ى", "ي")
+
+    # =====================================================
+    # 1. الفلتر الممنوع (الرفض المباشر)
+    # =====================================================
+    BANNED_WORDS = [
+        "كورة", "كورة", "مباراة", "مباريات", "لاعب", "لاعيبة", "ريال مدريد", "برشلونة", "ليفربول", "الأهلي", "الزمالك",
+        "فن", "فنان", "ممثل", "ممثلة", "مسلسل", "فيلم", "أغنية", "اغنية", "مهرجان",
+        "سياسة", "انتخابات", "رئيس", "حكومة", "اخبار", "أخبار",
+        "يوتيوب", "قناة", "فلوس", "اكسب", "شغلانة", "وظيفة"
+    ]
+    
+    if any(word in norm_msg for word in BANNED_WORDS):
+        refusal_msg = "أنا مساعد تعليمي 📚، ومش هقدر أساعدك في الموضوع ده. ممكن أسألك في حاجة تانية في دراستك؟"
+        if is_stream:
+            return iter([refusal_msg])
+        return refusal_msg
+
     try:
         from ai_brain import ask_groq, ask_groq_stream
     except:
         return "حدث خطأ في النظام." if not is_stream else iter(["حدث خطأ في النظام."])
 
-    import re
-    norm_msg = message.lower()
-    norm_msg = re.sub(r'[\u064B-\u065F\u0670]', '', norm_msg)
-    norm_msg = norm_msg.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه").replace("ى", "ي")
-    
-    # 1. هل السؤال فيه "طلب صريح" للكتب؟
+    # =====================================================
+    # 2. البحث في الكتب (بس لو السؤال تعليمي)
+    # =====================================================
     SEARCH_INTENT = ["اشرح", "لخص", "قارن", "احسب", "حل", "اوجد", "اذكر", "عدد", "مثال", "درس", "وحده", "منهج", "محتوى"]
     is_search = any(kw in norm_msg for kw in SEARCH_INTENT)
     
-    # 2. هل ذكر "اسم مادة" صريح؟
     has_subject = False
     for subj in SUBJECT_MAP.keys():
-        if re.search(r'\b' + re.escape(norm_msg) + r'\b', norm_msg): # لو كتب اسم المادة
-            if subj in norm_msg:
-                has_subject = True
-                break
+        if subj in norm_msg:
+            has_subject = True
+            break
 
-    # بنبحث في الكتب بس لو فيه طلب صريح أو اسم مادة
     context = None
     if is_search and has_subject:
         results = book_search_func(message, BOOKS, INDEX, IDF, top_k=3)
         if results and results[0]["score"] >= 1.0:
             context = "\n\n---\n\n".join([f"[{r['book']} — صفحة {r['page']}]\n{r['text'][:2000]}" for r in results])
 
+    # =====================================================
     # 3. نبعت للـ AI
+    # =====================================================
     if is_stream:
         return ask_groq_stream(message, context=context, history=CONVERSATION_HISTORY, is_lesson=False)
     else:
@@ -84,8 +101,13 @@ def chat():
 def chat_stream():
     data = request.get_json()
     gen = get_chat_response(data.get("message", ""), True)
-    if isinstance(gen, str):
-        return Response(iter([f"data: {json.dumps({'chunk': gen}, ensure_ascii=False)}\n\n", f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"]), mimetype="text/event-stream")
+    
+    if isinstance(gen, str) or hasattr(gen, '__next__') == False:
+        res_text = gen if isinstance(gen, str) else "".join(list(gen))
+        def text_gen():
+            yield f"data: {json.dumps({'chunk': res_text}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
+        return Response(text_gen(), mimetype="text/event-stream")
     
     def generate():
         full = []
