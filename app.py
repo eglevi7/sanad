@@ -29,10 +29,10 @@ def get_chat_response(message, is_stream=False):
     # 1. الفلتر الممنوع (الرفض المباشر)
     # =====================================================
     BANNED_PHRASES = [
-        "كورة", "مباراة", "مباريات", "لاعب", "لاعيبة", "ريال مدريد", "برشلونة", "ليفربول", "الأهلي", "الزمالك",
-        "فن", "فنان", "ممثل", "ممثلة", "مسلسل", "فيلم", "أغنية", "اغنية", "مهرجان",
-        "سياسة", "انتخابات", "رئيس", "حكومة", "اخبار", "أخبار",
-        "يوتيوب", "قناة يوتيوب", "قناتي", "فلوس", "اكسب", "شغلانة", "وظيفة"
+        "كورة", "مباراة", "مباريات", "لاعب", "ريال مدريد", "برشلونة", "ليفربول", "الأهلي", "الزمالك",
+        "فن", "فنان", "ممثل", "مسلسل", "فيلم", "أغنية", "مهرجان",
+        "سياسة", "انتخابات", "حكومة",
+        "يوتيوب", "قناتي", "فلوس", "اكسب", "شغلانة"
     ]
     
     if any(word in norm_msg for word in BANNED_PHRASES):
@@ -45,23 +45,24 @@ def get_chat_response(message, is_stream=False):
         return "حدث خطأ في النظام." if not is_stream else iter(["حدث خطأ في النظام."])
 
     # =====================================================
-    # 2. البحث في الكتب (بس لو السؤال تعليمي وصريح)
+    # 2. البحث الذكي (بس لو كتب اسم المادة صريح)
     # =====================================================
-    # شروط البحث: لازم يكون فيه "نية بحث" + "اسم مادة" + يكون سؤال طويل شوية
-    SEARCH_INTENT = ["اشرح", "لخص", "قارن", "احسب", "حل", "اوجد", "اذكر", "عدد", "مثال", "درس", "وحده", "منهج", "محتوى", "مفهوم", "تعريف"]
-    is_search = any(kw in norm_msg for kw in SEARCH_INTENT)
+    context = None
+    detected_subject = None
     
-    has_subject = False
-    for subj in SUBJECT_MAP.keys():
-        if re.search(r'\b' + re.escape(subj) + r'\b', norm_msg):
-            has_subject = True
+    # نشوف الطالب كتب اسم أنهي مادة بالظبط
+    for subj, book_keyword in SUBJECT_MAP.items():
+        if subj in norm_msg:
+            detected_subject = book_keyword
             break
 
-    context = None
-    if is_search and has_subject and len(norm_msg.split()) >= 3:
+    if detected_subject:
+        # لو لقينا مادة، نبحث جوه كتب المادة دي بس
         results = book_search_func(message, BOOKS, INDEX, IDF, top_k=3)
-        if results and results[0]["score"] >= 1.2: # رفعنا السكور شوية عشان ميجيبش حاجات عشوائية
-            context = "\n\n---\n\n".join([f"[{r['book']} — صفحة {r['page']}]\n{r['text'][:2000]}" for r in results])
+        filtered_results = [r for r in results if detected_subject.lower() in r["book"].lower()]
+        
+        if filtered_results and filtered_results[0]["score"] >= 0.8:
+            context = "\n\n---\n\n".join([f"[{r['book']} — صفحة {r['page']}]\n{r['text'][:2000]}" for r in filtered_results])
 
     # =====================================================
     # 3. نبعت للـ AI
