@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 from book_search import load_books, load_or_build_index, search as book_search_func, SUBJECT_MAP
@@ -20,7 +21,6 @@ def get_chat_response(message, is_stream=False):
     if not message:
         return "اكتبلي حاجة الأول 😅" if not is_stream else iter(["اكتبلي حاجة الأول 😅"])
 
-    import re
     norm_msg = message.lower()
     norm_msg = re.sub(r'[\u064B-\u065F\u0670]', '', norm_msg)
     norm_msg = norm_msg.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه").replace("ى", "ي")
@@ -28,18 +28,16 @@ def get_chat_response(message, is_stream=False):
     # =====================================================
     # 1. الفلتر الممنوع (الرفض المباشر)
     # =====================================================
-    BANNED_WORDS = [
-        "كورة", "كورة", "مباراة", "مباريات", "لاعب", "لاعيبة", "ريال مدريد", "برشلونة", "ليفربول", "الأهلي", "الزمالك",
+    BANNED_PHRASES = [
+        "كورة", "مباراة", "مباريات", "لاعب", "لاعيبة", "ريال مدريد", "برشلونة", "ليفربول", "الأهلي", "الزمالك",
         "فن", "فنان", "ممثل", "ممثلة", "مسلسل", "فيلم", "أغنية", "اغنية", "مهرجان",
         "سياسة", "انتخابات", "رئيس", "حكومة", "اخبار", "أخبار",
-        "يوتيوب", "قناة", "فلوس", "اكسب", "شغلانة", "وظيفة"
+        "يوتيوب", "قناة يوتيوب", "قناتي", "فلوس", "اكسب", "شغلانة", "وظيفة"
     ]
     
-    if any(word in norm_msg for word in BANNED_WORDS):
+    if any(word in norm_msg for word in BANNED_PHRASES):
         refusal_msg = "أنا مساعد تعليمي 📚، ومش هقدر أساعدك في الموضوع ده. ممكن أسألك في حاجة تانية في دراستك؟"
-        if is_stream:
-            return iter([refusal_msg])
-        return refusal_msg
+        return iter([refusal_msg]) if is_stream else refusal_msg
 
     try:
         from ai_brain import ask_groq, ask_groq_stream
@@ -47,21 +45,22 @@ def get_chat_response(message, is_stream=False):
         return "حدث خطأ في النظام." if not is_stream else iter(["حدث خطأ في النظام."])
 
     # =====================================================
-    # 2. البحث في الكتب (بس لو السؤال تعليمي)
+    # 2. البحث في الكتب (بس لو السؤال تعليمي وصريح)
     # =====================================================
-    SEARCH_INTENT = ["اشرح", "لخص", "قارن", "احسب", "حل", "اوجد", "اذكر", "عدد", "مثال", "درس", "وحده", "منهج", "محتوى"]
+    # شروط البحث: لازم يكون فيه "نية بحث" + "اسم مادة" + يكون سؤال طويل شوية
+    SEARCH_INTENT = ["اشرح", "لخص", "قارن", "احسب", "حل", "اوجد", "اذكر", "عدد", "مثال", "درس", "وحده", "منهج", "محتوى", "مفهوم", "تعريف"]
     is_search = any(kw in norm_msg for kw in SEARCH_INTENT)
     
     has_subject = False
     for subj in SUBJECT_MAP.keys():
-        if subj in norm_msg:
+        if re.search(r'\b' + re.escape(subj) + r'\b', norm_msg):
             has_subject = True
             break
 
     context = None
-    if is_search and has_subject:
+    if is_search and has_subject and len(norm_msg.split()) >= 3:
         results = book_search_func(message, BOOKS, INDEX, IDF, top_k=3)
-        if results and results[0]["score"] >= 1.0:
+        if results and results[0]["score"] >= 1.2: # رفعنا السكور شوية عشان ميجيبش حاجات عشوائية
             context = "\n\n---\n\n".join([f"[{r['book']} — صفحة {r['page']}]\n{r['text'][:2000]}" for r in results])
 
     # =====================================================
@@ -101,14 +100,8 @@ def chat():
 def chat_stream():
     data = request.get_json()
     gen = get_chat_response(data.get("message", ""), True)
-    
-    if isinstance(gen, str) or hasattr(gen, '__next__') == False:
-        res_text = gen if isinstance(gen, str) else "".join(list(gen))
-        def text_gen():
-            yield f"data: {json.dumps({'chunk': res_text}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
-        return Response(text_gen(), mimetype="text/event-stream")
-    
+    if isinstance(gen, str):
+        return Response(iter([f"data: {json.dumps({'chunk': gen}, ensure_ascii=False)}\n\n", f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"]), mimetype="text/event-stream")
     def generate():
         full = []
         for chunk in gen:
