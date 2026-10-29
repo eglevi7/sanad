@@ -2,58 +2,18 @@ import os
 import json
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
-
-from book_search import (
-    load_books,
-    load_or_build_index,
-    search as book_search_func,
-    SUBJECT_MAP,
-)
-
-# =========================
-# إعداد Flask
-# =========================
+from book_search import load_books, load_or_build_index, search as book_search_func, SUBJECT_MAP
 
 app = Flask(__name__, static_folder="ui", static_url_path="")
 CORS(app)
 
-# =========================
-# المتغيرات العامة
-# =========================
-
-BOOKS = []
-INDEX = {}
-IDF = {}
-TOTAL_PAGES = 0
-
+BOOKS, INDEX, IDF, TOTAL_PAGES = [], {}, {}, 0
 CONVERSATION_HISTORY = []
-MAX_HISTORY = 10
-
 
 def add_to_history(role, content):
     CONVERSATION_HISTORY.append({"role": role, "content": content})
-    while len(CONVERSATION_HISTORY) > MAX_HISTORY:
+    if len(CONVERSATION_HISTORY) > 10:
         CONVERSATION_HISTORY.pop(0)
-
-
-def clear_history():
-    CONVERSATION_HISTORY.clear()
-
-
-def normalize_text(text):
-    import re
-    text = text.lower()
-    text = re.sub(r'[\u064B-\u065F\u0670]', '', text)
-    text = text.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
-    text = text.replace("ة", "ه").replace("ى", "ي")
-    text = re.sub(r'[؟?!.,،:؛()"\'\-]', ' ', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text
-
-
-# =========================
-# عقل Sanad
-# =========================
 
 def get_chat_response(message, is_stream=False):
     message = message.strip()
@@ -62,44 +22,34 @@ def get_chat_response(message, is_stream=False):
 
     try:
         from ai_brain import ask_groq, ask_groq_stream
-    except Exception as e:
-        print(f"⚠️ مش قادر أحمّل ai_brain: {e}")
+    except:
         return "حدث خطأ في النظام." if not is_stream else iter(["حدث خطأ في النظام."])
 
-    norm_msg = normalize_text(message)
-
-    # =====================================================
-    # 1. هل الطالب بيطلب بحث حقيقي في الكتب؟ (نية البحث)
-    # =====================================================
-    SEARCH_INTENT_KEYWORDS = [
-        "اشرح", "اشرحلي", "لخص", "لخصلي", "قارن", "احسب", "حل", "حللي",
-        "عرف", "تعريف", "مثال", "امثلة", "اذكر", "عدد",
-        "درس", "الدرس", "وحدة", "الوحدة", "محتوى", "منهج",
-        "عايز اعرف", "ايه هي", "ايه هو", "ما هي", "ما هو"
-    ]
+    import re
+    norm_msg = message.lower()
+    norm_msg = re.sub(r'[\u064B-\u065F\u0670]', '', norm_msg)
+    norm_msg = norm_msg.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ة", "ه").replace("ى", "ي")
     
-    is_search_intent = any(kw in norm_msg for kw in SEARCH_INTENT_KEYWORDS)
+    # 1. هل السؤال فيه "طلب صريح" للكتب؟
+    SEARCH_INTENT = ["اشرح", "لخص", "قارن", "احسب", "حل", "اوجد", "اذكر", "عدد", "مثال", "درس", "وحده", "منهج", "محتوى"]
+    is_search = any(kw in norm_msg for kw in SEARCH_INTENT)
     
-    # لو الطالب ذكر اسم مادة صراحة مع نية بحث
+    # 2. هل ذكر "اسم مادة" صريح؟
     has_subject = False
     for subj in SUBJECT_MAP.keys():
-        if normalize_text(subj) in norm_msg:
-            has_subject = True
-            break
+        if re.search(r'\b' + re.escape(norm_msg) + r'\b', norm_msg): # لو كتب اسم المادة
+            if subj in norm_msg:
+                has_subject = True
+                break
 
-    # لو الكلام مجرد سؤال عادي (ازيك، الحمد لله، عندي قناة...)، منبحثش في الكتب
+    # بنبحث في الكتب بس لو فيه طلب صريح أو اسم مادة
     context = None
-    if is_search_intent:
+    if is_search and has_subject:
         results = book_search_func(message, BOOKS, INDEX, IDF, top_k=3)
         if results and results[0]["score"] >= 1.0:
-            context_parts = []
-            for r in results:
-                context_parts.append(f"[{r['book']} — صفحة {r['page']}]\n{r['text'][:2000]}")
-            context = "\n\n---\n\n".join(context_parts)
+            context = "\n\n---\n\n".join([f"[{r['book']} — صفحة {r['page']}]\n{r['text'][:2000]}" for r in results])
 
-    # =====================================================
-    # 2. نبعت للـ AI (مع أو بدون سياق من الكتب)
-    # =====================================================
+    # 3. نبعت للـ AI
     if is_stream:
         return ask_groq_stream(message, context=context, history=CONVERSATION_HISTORY, is_lesson=False)
     else:
@@ -108,118 +58,58 @@ def get_chat_response(message, is_stream=False):
             add_to_history("user", message)
             add_to_history("assistant", ans)
             return ans
-        return "معلش، مش قادر أجاوب دلوقتي. جرب تاني."
-
-
-# =========================
-# Routes
-# =========================
+        return "معلش، مش قادر أجاوب دلوقتي."
 
 @app.route("/")
-def index():
-    return send_from_directory("ui", "index.html")
-
-
+def index(): return send_from_directory("ui", "index.html")
 @app.route("/ui/<path:filename>")
-def serve_ui(filename):
-    return send_from_directory("ui", filename)
-
+def serve_ui(filename): return send_from_directory("ui", filename)
 @app.route("/manifest.json")
-def serve_manifest():
-    return send_from_directory(".", "manifest.json")
-
+def serve_manifest(): return send_from_directory(".", "manifest.json")
 @app.route("/service-worker.js")
-def serve_sw():
-    return send_from_directory(".", "service-worker.js")
-
+def serve_sw(): return send_from_directory(".", "service-worker.js")
 @app.route("/icon-192.png")
-def serve_icon_192():
-    return send_from_directory(".", "icon-192.png")
-
+def serve_icon_192(): return send_from_directory(".", "icon-192.png")
 @app.route("/icon-512.png")
-def serve_icon_512():
-    return send_from_directory(".", "icon-512.png")
-
+def serve_icon_512(): return send_from_directory(".", "icon-512.png")
 @app.route("/logo.png")
-def serve_logo():
-    return send_from_directory(".", "logo.png")
-
+def serve_logo(): return send_from_directory(".", "logo.png")
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
-    try:
-        data = request.get_json()
-        message = data.get("message", "").strip()
-        if not message:
-            return jsonify({"ok": False, "error": "الرسالة فاضية"}), 400
-
-        response = get_chat_response(message, is_stream=False)
-        return jsonify({"ok": True, "text": response, "suggestions": []})
-    except Exception as e:
-        print(f"❌ خطأ: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
-
+    data = request.get_json()
+    return jsonify({"ok": True, "text": get_chat_response(data.get("message", ""), False)})
 
 @app.route("/api/chat/stream", methods=["POST"])
 def chat_stream():
-    try:
-        data = request.get_json()
-        message = data.get("message", "").strip()
-        if not message:
-            return jsonify({"ok": False, "error": "الرسالة فاضية"}), 400
-
-        generator_or_text = get_chat_response(message, is_stream=True)
-
-        if isinstance(generator_or_text, str):
-            def text_generate():
-                yield f"data: {json.dumps({'chunk': generator_or_text}, ensure_ascii=False)}\n\n"
-                yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
-            return Response(text_generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-        def generate():
-            full_response = []
-            try:
-                for chunk in generator_or_text:
-                    full_response.append(chunk)
-                    yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
-                
-                final_answer = "".join(full_response)
-                add_to_history("user", message)
-                add_to_history("assistant", final_answer)
-                yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
-
-        return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-    except Exception as e:
-        print(f"❌ خطأ في streaming: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
-
+    data = request.get_json()
+    gen = get_chat_response(data.get("message", ""), True)
+    if isinstance(gen, str):
+        return Response(iter([f"data: {json.dumps({'chunk': gen}, ensure_ascii=False)}\n\n", f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"]), mimetype="text/event-stream")
+    
+    def generate():
+        full = []
+        for chunk in gen:
+            full.append(chunk)
+            yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
+        add_to_history("user", data.get("message", ""))
+        add_to_history("assistant", "".join(full))
+        yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
+    return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 @app.route("/api/clear", methods=["POST"])
 def clear():
-    clear_history()
+    CONVERSATION_HISTORY.clear()
     return jsonify({"ok": True})
-
-
-# =========================
-# تحميل الكتب
-# =========================
 
 def load_data():
     global BOOKS, INDEX, IDF, TOTAL_PAGES
-    print("⏳ بنجهز الكتب...")
     try:
         BOOKS = load_books()
         INDEX, IDF, TOTAL_PAGES = load_or_build_index(BOOKS)
-        print(f"✅ جاهز — {len(BOOKS)} كتاب، {TOTAL_PAGES} صفحة")
     except Exception as e:
-        print(f"⚠️ فشل تحميل الكتب: {e}")
-
+        print("Error:", e)
 load_data()
 
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
