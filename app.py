@@ -66,7 +66,34 @@ def get_chat_response(message, is_stream=False):
         print(f"⚠️ مش قادر أحمّل ai_brain: {e}")
         return "حدث خطأ في النظام." if not is_stream else iter(["حدث خطأ في النظام."])
 
-    # 1. البحث في الكتب (لو لاقى سياق قوي، نبعته للـ AI)
+    norm_msg = normalize_text(message)
+
+    # =========================
+    # 1. فلتر الكلام العادي (مش بحث في الكتب)
+    # =========================
+    CASUAL_WORDS = [
+        "ازيك", "عامل ايه", "اخبارك", "ايه الاخبار", "صباح الخير", "مساء الخير",
+        "اهلا", "سلام", "هاي", "hello", "hi",
+        "عادي نتكلم", "نتكلم", "كلام", "شكرا", "تسلم",
+        "مين انت", "اسمك ايه", "انت مين", "بتعمل ايه",
+        "ممكن نتكلم", "عايز اتكلم", "خلينا نتكلم", "نتكلم عادي"
+    ]
+    
+    is_casual = any(normalize_text(w) in norm_msg for w in CASUAL_WORDS)
+    
+    if is_casual:
+        if is_stream:
+            return ask_groq_stream(message, context=None, history=CONVERSATION_HISTORY, is_lesson=False)
+        else:
+            ans = ask_groq(message, context=None, history=CONVERSATION_HISTORY, is_lesson=False)
+            if ans:
+                add_to_history("user", message)
+                add_to_history("assistant", ans)
+                return ans
+
+    # =========================
+    # 2. البحث في الكتب للأسئلة التعليمية
+    # =========================
     context = None
     results = book_search_func(message, BOOKS, INDEX, IDF, top_k=5)
     
@@ -77,7 +104,9 @@ def get_chat_response(message, is_stream=False):
             context_parts.append(f"[{r['book']} — صفحة {r['page']}]\n{r['text'][:2000]}")
         context = "\n\n---\n\n".join(context_parts)
 
-    # 2. نبعت للـ AI (لو فيه سياق هيشرح منه، لو مفيش هيجاوب من معرفته)
+    # =========================
+    # 3. نبعت للـ AI (مع أو بدون سياق)
+    # =========================
     if is_stream:
         return ask_groq_stream(message, context=context, history=CONVERSATION_HISTORY, is_lesson=False)
     else:
