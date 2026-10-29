@@ -1,3 +1,4 @@
+
 import json
 import re
 import math
@@ -548,6 +549,14 @@ LESSON_NUMBERS = {
 def detect_lesson_number(question):
     q = normalize(question)
 
+    # نشيل أي كلام عن "الوحدة" الأول عشان ميتلخبطش مع رقم الدرس
+    unit_patterns = [
+        r'الوحده\s+ال(اولي|اولي|تانيه|ثانيه|تالته|ثالثه|رابعه|رابعه|خامسه|خامسه)',
+        r'وحده\s+ال(اولي|اولي|تانيه|ثانيه|تالته|ثالثه|رابعه|رابعه|خامسه|خامسه)'
+    ]
+    for pattern in unit_patterns:
+        q = re.sub(pattern, ' ', q)
+
     sorted_keys = sorted(LESSON_NUMBERS.keys(), key=len, reverse=True)
 
     for key in sorted_keys:
@@ -729,7 +738,6 @@ def find_grammar_by_name(subject, name, books):
         for lesson_name, lesson_data in unit_data["grammar"].items():
             title_norm = normalize(lesson_data["title"])
 
-            # نستخدم similarity بدل المقارنة الحرفية
             words1 = set(name_norm.split())
             words2 = set(title_norm.split())
 
@@ -752,43 +760,3 @@ def find_grammar_by_name(subject, name, books):
         return best_match
 
     return None
-
-
-# ============================================================
-# اختبار تفاعلي
-# ============================================================
-
-def main():
-    print("=" * 60)
-    print("📚 Sanad - Book Search Test")
-    print("=" * 60)
-
-    books = load_books()
-    print(f"✅ {len(books)} كتاب متحملين")
-
-    index, idf, total = load_or_build_index(books)
-    print(f"✅ {len(index)} كلمة فريدة من {total} صفحة")
-    print("=" * 60)
-    print("اكتب سؤالك (أو 'خروج' للإنهاء):")
-
-    while True:
-        q = input("\n❓ ").strip()
-        if not q or q in ("خروج", "exit", "quit"):
-            break
-
-        t = time.time()
-        result = find_answer(q, books, index, idf)
-        elapsed = time.time() - t
-
-        if result is None:
-            print("❌ مفيش إجابة")
-            continue
-
-        print(f"\n{result['text']}")
-        if "source" in result:
-            print(f"\n📖 المصدر: {result['source']}")
-        print(f"⏱️ ({elapsed*1000:.0f}ms)")
-
-
-if __name__ == "__main__":
-    main()
