@@ -8,6 +8,7 @@ from book_search import (
     load_or_build_index,
     search as book_search_func,
     detect_subject,
+    SUBJECT_MAP,
 )
 
 # =========================
@@ -52,7 +53,7 @@ def normalize_text(text):
 
 
 # =========================
-# عقل Sanad البسيط
+# عقل Sanad
 # =========================
 
 def get_chat_response(message, is_stream=False):
@@ -68,45 +69,38 @@ def get_chat_response(message, is_stream=False):
 
     norm_msg = normalize_text(message)
 
-    # =========================
-    # 1. فلتر الكلام العادي (مش بحث في الكتب)
-    # =========================
-    CASUAL_WORDS = [
-        "ازيك", "عامل ايه", "اخبارك", "ايه الاخبار", "صباح الخير", "مساء الخير",
-        "اهلا", "سلام", "هاي", "hello", "hi",
-        "عادي نتكلم", "نتكلم", "كلام", "شكرا", "تسلم",
-        "مين انت", "اسمك ايه", "انت مين", "بتعمل ايه",
-        "ممكن نتكلم", "عايز اتكلم", "خلينا نتكلم", "نتكلم عادي"
+    # =====================================================
+    # 1. هل السؤال تعليمي؟ (فيه كلمة درس، شرح، مادة، إلخ)
+    # =====================================================
+    EDUCATIONAL_KEYWORDS = [
+        "اشرح", "لخص", "قارن", "احسب", "حل", "عرف", "مثال", "امثلة",
+        "درس", "الدرس", "وحدة", "الوحدة", "محتوى", "منهج",
+        "اسئلة", "سؤال", "تمرين", "اختبار"
     ]
     
-    is_casual = any(normalize_text(w) in norm_msg for w in CASUAL_WORDS)
+    is_educational = any(kw in norm_msg for kw in EDUCATIONAL_KEYWORDS)
     
-    if is_casual:
-        if is_stream:
-            return ask_groq_stream(message, context=None, history=CONVERSATION_HISTORY, is_lesson=False)
-        else:
-            ans = ask_groq(message, context=None, history=CONVERSATION_HISTORY, is_lesson=False)
-            if ans:
-                add_to_history("user", message)
-                add_to_history("assistant", ans)
-                return ans
+    # لو فيه اسم مادة، يبقى تعليمي برضه
+    for subj in SUBJECT_MAP.keys():
+        if normalize_text(subj) in norm_msg:
+            is_educational = True
+            break
 
-    # =========================
-    # 2. البحث في الكتب للأسئلة التعليمية
-    # =========================
+    # =====================================================
+    # 2. البحث في الكتب (بس لو السؤال تعليمي)
+    # =====================================================
     context = None
-    results = book_search_func(message, BOOKS, INDEX, IDF, top_k=5)
-    
-    # لو أفضل نتيجة ليها سكور معقول
-    if results and results[0]["score"] >= 0.8:
-        context_parts = []
-        for r in results:
-            context_parts.append(f"[{r['book']} — صفحة {r['page']}]\n{r['text'][:2000]}")
-        context = "\n\n---\n\n".join(context_parts)
+    if is_educational:
+        results = book_search_func(message, BOOKS, INDEX, IDF, top_k=3)
+        if results and results[0]["score"] >= 1.0:
+            context_parts = []
+            for r in results:
+                context_parts.append(f"[{r['book']} — صفحة {r['page']}]\n{r['text'][:2000]}")
+            context = "\n\n---\n\n".join(context_parts)
 
-    # =========================
-    # 3. نبعت للـ AI (مع أو بدون سياق)
-    # =========================
+    # =====================================================
+    # 3. نبعت للـ AI
+    # =====================================================
     if is_stream:
         return ask_groq_stream(message, context=context, history=CONVERSATION_HISTORY, is_lesson=False)
     else:
